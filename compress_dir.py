@@ -7,6 +7,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 import pickle
 import numpy as np
+import os
+import concurrent.futures
 
 import torch
 from PIL import Image
@@ -38,7 +40,6 @@ def rescale_image(image: Tensor, back_to_float: bool = True) -> Tensor:
 
 def main():
     parser = ArgumentParser()
-
     parser.add_argument("input_dir", type=str, help="path to input directory containing PNG files")
     parser.add_argument("output_dir", type=str, help="path to output directory")
     parser.add_argument("--decompress", action="store_true", help="decompress the compressed files")
@@ -60,7 +61,8 @@ def main():
     fid_metric = FrechetInceptionDistance().to(device)
 
     if args.decompress:
-        for file in tqdm(input_dir.glob("*.compressed")):
+        files_to_process = list(input_dir.glob("*.compressed"))
+        def process_file(file):
             with open(file, "rb") as f:
                 compressed = pickle.load(f)
 
@@ -73,7 +75,8 @@ def main():
             print(f"Decompressed image saved to: {output_dir / f'{file.stem}_decompressed.png'}")
 
     else:
-        for file in tqdm(input_dir.glob("*.png")):
+        files_to_process = list(input_dir.glob("*.png"))
+        def process_file(file):
             with Image.open(file) as image_pil:
                 image_pil = image_pil.convert("RGB")
 
@@ -111,6 +114,11 @@ def main():
             print(f"LPIPS: {lpips_metric.compute()}")
             print(f"FID: {fid_metric.compute()}")
             print(f"Compressed file saved to: {output_file}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(process_file, file) for file in files_to_process]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 if __name__ == "__main__":
     main()
