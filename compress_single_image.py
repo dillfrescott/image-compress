@@ -48,7 +48,7 @@ def main():
     output_path = Path(args.output_path)
 
     device = torch.device("cuda")
-    model = torch.hub.load("facebookresearch/NeuralCompression", "msillm_quality_1")
+    model = torch.hub.load("facebookresearch/NeuralCompression", "msillm_quality_3") # From 1-6 lower is smaller but worse quality
     model = model.to(device)
     model = model.eval()
     model.update()
